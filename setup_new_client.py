@@ -1,0 +1,139 @@
+import time
+from create_chromadb_products_collection import *
+
+@dbg_print
+def get_all_valid_metadata_values_from_products():
+    """
+    Extracts metadata from the products data.
+    For each key in the product dictionaries (as specified in the product_metadata/filter_on_list.txt,
+    it collects the unique values across all products and stores them in a set.
+
+    Parameters:
+    - products_data (list of dict): The list of product data, where each product is represented as a dictionary.
+
+    Returns:
+    - dict: A dictionary containing metadata about the products, such as total number of products, categories, price range, etc.
+    """
+    products_data = read_from_csv_file_with_header(CLIENT_INVENTORY_CSV_FILE)
+    valid_keys = read_file_as_tuple(CLIENT_FILTER_ON_LIST_FILE)
+
+    metadata = dict()
+    for d in products_data:
+        for key, val in d.items():
+            if key not in valid_keys:
+                continue
+            if key not in metadata.keys():
+                metadata[key] = set()
+            metadata[key].add(val)
+
+        metadata["price"] = {"min": 0, "max": "inf"}
+
+    for key in metadata.keys():
+        if isinstance(metadata[key], set):
+            metadata[key] = list(metadata[key])
+
+    dump_to_json_file(CLIENT_VALID_METADATA_VALUES_FILE, metadata, indent=2)
+
+
+@dbg_print
+def create_client_folders():
+    print(f"Client site: {CLIENT_PATH}")
+    os.makedirs(CLIENT_PATH, exist_ok=True)
+    os.makedirs(CLIENT_CHROMA_DB_PATH, exist_ok=True)
+    os.makedirs(CLIENT_FAQ_PATH, exist_ok=True)
+    os.makedirs(CLIENT_INVENTORY_PATH, exist_ok=True)
+    os.makedirs(CLIENT_METADATA_PATH, exist_ok=True)
+    os.makedirs(CLIENT_SYSTEM_PROMPTS_PATH, exist_ok=True)
+
+
+@dbg_print
+def archive_inventory_csv_file(csv_file: str = None):
+    """
+    Creates the inventory CSV file for the client by moving it from a specified location.
+    """
+    try:
+        print(f"Moving {csv_file} to {CLIENT_INVENTORY_CSV_FILE}")
+        if os.path.isdir(CLIENT_INVENTORY_PATH):
+            move_file(csv_file, CLIENT_INVENTORY_CSV_FILE)
+        else:
+            time.sleep(1)
+    except Exception as e:
+        pass
+
+
+@dbg_print
+def create_metadata_files():
+    """
+    Creates the metadata files for the client by moving them from specified locations.
+
+    Creates dummy filter_on_list.txt using column names from the inventory CSV file
+    Creates dummy metadata_fields_list.txt using column names from the inventory CSV file
+    """
+
+    inventory_data = read_from_csv_file_with_header(CLIENT_INVENTORY_CSV_FILE)
+    if not inventory_data:
+        print(f"No data found in {CLIENT_INVENTORY_CSV_FILE}. Cannot create metadata files.")
+        return
+
+    column_names = inventory_data[0].keys()
+
+    # Create CLIENT_FILTER_ON_LIST_FILE
+    with open(CLIENT_FILTER_ON_LIST_FILE, "w") as f:
+        for column in column_names:
+            f.write(f"{column}\n")
+
+    # Create CLIENT_METADATA_FIELDS_LIST
+    with open(CLIENT_METADATA_FIELDS_LIST, "w") as f:
+        for column in column_names:
+            f.write(f"{column}\n")
+
+
+@dbg_print
+def create_faq_file():
+    """
+    Creates a dummy FAQ file for the client with some example questions and answers.
+    """
+    faq_content = """Q: Are you open on weekends?\nKeywords: open, weekends, saturday, sunday\nA: Yes, we are open on Saturdays from 10am to 6pm and on Sundays from 11am to 5pm."""
+    with open(CLIENT_FAQ_FILE, "w") as f:
+        f.write(faq_content)
+
+
+@dbg_print
+def copy_system_prompts():
+    """
+    Copies system prompt templates from a specified source directory to the client's system prompts directory.
+    """
+    source_dir = os.path.join(os.path.dirname(__file__), "system_prompts_templates")
+    dest_dir = CLIENT_SYSTEM_PROMPTS_PATH
+    copy_files_from_directory(source_dir, dest_dir)
+
+
+if __name__ == "__main__":
+    """
+    Main method for testing get_products_metadata function.
+    
+    USAGE: python setup_new_client.py path/to/inventory.csv
+    """
+    pass
+
+    args = sys.argv
+    if len(args) > 1:
+        csv_file = args[1]
+    else:
+        print("\nUSAGE: python setup_new_client.py path/to/inventory.csv\n")
+        sys.exit(1)
+
+    if not os.path.isfile(csv_file):
+        print(f"\nERROR: File {csv_file} does not exist.\n")
+        sys.exit(1)
+
+
+    create_client_folders()
+    archive_inventory_csv_file(csv_file)
+    create_metadata_files()
+    index_inventory_to_chroma()
+    create_faq_file()
+    copy_system_prompts()
+    get_all_valid_metadata_values_from_products()
+
+    print(f"\nYou;re ready to execute queries for {CLIENT_NAME}\n")
