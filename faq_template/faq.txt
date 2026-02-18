@@ -1,5 +1,5 @@
-Q: Are you open on weekends?
-Keywords: open, weekends, Saturday, Sunday, hours, weekend hours
+Q: What are your store hours?
+Keywords: open, weekends, Saturday, Sunday, hours, weekend hours, store hours
 A: We are open on Saturdays from 10am to 6pm and on Sundays from 11am to 5pm.
 
 Q: Do you offer free shipping?

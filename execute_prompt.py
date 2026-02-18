@@ -87,7 +87,7 @@ if __name__ == '__main__':
         #"What's a good look for a woman to wear to a park on a Sunday afternoon?",
         #"Can I cancel my order after placing it?"
         "Are you hiring?",
-        "What are your weakand hours?",
+        "Are you open on weekends?",
     ]
     for query in test_queries:
         response = do_execute_prompt(query)
