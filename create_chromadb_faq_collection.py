@@ -37,18 +37,12 @@ from utils import read_from_text_file
 # Collection name requested by the user
 COLLECTION_NAME = "faq"
 
-# Base path for the current client site (from .env via utils)
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CLIENT_SITE = os.environ.get("CLIENT_SITE", "")
-
-if not CLIENT_SITE:
-    raise RuntimeError(
-        "CLIENT_SITE is not set in the environment/.env; cannot locate FAQ file."
-    )
-
-CLIENT_SITE_ROOT = os.path.join(PROJECT_ROOT, "client_sites", CLIENT_SITE)
-FAQ_FILE_PATH = os.path.join(CLIENT_SITE_ROOT, "faq", "faq.txt")
-CLIENT_CHROMA_DB_PATH = os.path.join(CLIENT_SITE_ROOT, "chroma_db")
+CLIENT_NAME = os.getenv("CLIENT_SITE", "demo")
+CLIENT_SITES_LOCATION = os.getenv("CLIENT_SITES_LOCATION", os.path.join(os.path.dirname(__file__), "..", "client_sites"))
+CLIENT_PATH = os.path.join(CLIENT_SITES_LOCATION, CLIENT_NAME)
+CLIENT_FAQ_PATH = os.path.join(CLIENT_PATH, "faq")
+CLIENT_FAQ_FILE = os.path.join(CLIENT_FAQ_PATH, "faq.txt")
+CLIENT_CHROMA_DB_PATH = os.path.join(CLIENT_PATH, "chroma_db")
 
 # Reuse the same model as products for consistency / speed
 FAQ_EMBEDDER_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
@@ -60,9 +54,9 @@ FAQ_EMBEDDER_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 def _ensure_faq_file_exists() -> None:
     """Validate that the FAQ file exists."""
-    if not os.path.isfile(FAQ_FILE_PATH):
+    if not os.path.isfile(CLIENT_FAQ_FILE):
         raise FileNotFoundError(
-            f"FAQ file not found at {FAQ_FILE_PATH}. "
+            f"FAQ file not found at {CLIENT_FAQ_FILE}. "
             "Expected path: client_sites/CLIENT_SITE/faq/faq.txt"
         )
 
@@ -158,7 +152,7 @@ def index_faq_to_chroma() -> None:
     collection = _ensure_collection()
     existing_ids = _get_existing_ids(collection)
 
-    faq_text: str = read_from_text_file(FAQ_FILE_PATH)
+    faq_text: str = read_from_text_file(CLIENT_FAQ_FILE)
     if not faq_text.strip():
         print("FAQ file is empty; nothing to index.")
         return
@@ -186,7 +180,7 @@ def index_faq_to_chroma() -> None:
                 "question": entry.get("question", ""),
                 "answer": entry.get("answer", ""),
                 "keywords": entry.get("keywords", []),
-                "client_site": CLIENT_SITE,
+                "client_site": CLIENT_NAME,
                 "source": "faq.txt",
             }
         )
@@ -200,28 +194,15 @@ def index_faq_to_chroma() -> None:
     collection.add(documents=docs, metadatas=metadatas, ids=ids, embeddings=embeddings)
 
     print(
-        f"Indexed {len(ids)} FAQ entries for client '{CLIENT_SITE}' into Chroma collection "
+        f"Indexed {len(ids)} FAQ entries for client '{CLIENT_NAME}' into Chroma collection "
         f"'{COLLECTION_NAME}' at '{CLIENT_CHROMA_DB_PATH}'."
     )
 
 
 def drop_faq_collection() -> None:
     """Delete the `faq` collection for the configured client site if present."""
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    client_site = os.environ.get("CLIENT_SITE", "")
 
-    if not client_site:
-        raise RuntimeError(
-            "CLIENT_SITE is not set in the environment/.env; cannot locate chroma_db path."
-        )
-
-    client_site_root = os.path.join(project_root, "client_sites", client_site)
-    client_chroma_db_path = os.path.join(client_site_root, "chroma_db")
-
-    print(f"CLIENT_SITE: {client_site}")
-    print(f"Chroma DB path: {client_chroma_db_path}")
-
-    client = chromadb.PersistentClient(path=client_chroma_db_path)
+    client = chromadb.PersistentClient(path=CLIENT_CHROMA_DB_PATH)
 
     try:
         client.delete_collection("faq")
