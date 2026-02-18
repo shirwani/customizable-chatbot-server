@@ -5,7 +5,7 @@ venv/
 
 .env
 
-run
+code/run
 deploy
 
 

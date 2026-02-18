@@ -1,5 +1,24 @@
+"""
+This script sets up a new client by creating necessary folders, moving inventory CSV files, creating metadata files, and preparing the environment for querying.
+
+The main steps include:
+1. Creating client-specific folders for inventory, metadata, system prompts, and ChromaDB.
+2. Moving the provided inventory CSV file to the client's inventory directory.
+3. Generating metadata files based on the inventory CSV file's columns.
+4. Indexing the inventory data into ChromaDB for efficient querying.
+5. Creating a dummy FAQ file for the client.
+6. Copying system prompt templates to the client's system prompts directory.
+
+Prerequisites:
+- The inventory CSV file must be provided as a command-line argument when running the script.
+"""
 import time
+import sys
+import os
 from create_chromadb_products_collection import *
+from create_chromadb_faq_collection import *
+from utils import *
+
 
 @dbg_print
 def get_all_valid_metadata_values_from_products():
@@ -72,30 +91,49 @@ def create_metadata_files():
 
     inventory_data = read_from_csv_file_with_header(CLIENT_INVENTORY_CSV_FILE)
     if not inventory_data:
-        print(f"No data found in {CLIENT_INVENTORY_CSV_FILE}. Cannot create metadata files.")
+        print(f"No data found in {CLIENT_INVENTORY_CSV_FILE}. Cannot create {CLIENT_METADATA_FIELDS_LIST}.")
         return
 
-    column_names = inventory_data[0].keys()
-
-    # Create CLIENT_FILTER_ON_LIST_FILE
-    with open(CLIENT_FILTER_ON_LIST_FILE, "w") as f:
-        for column in column_names:
+    metadata_fields_list = inventory_data[0].keys()
+    with open(CLIENT_METADATA_FIELDS_LIST, "w") as f:
+        for column in metadata_fields_list:
             f.write(f"{column}\n")
 
-    # Create CLIENT_METADATA_FIELDS_LIST
-    with open(CLIENT_METADATA_FIELDS_LIST, "w") as f:
-        for column in column_names:
+
+    filter_on_list = get_non_unique_columns(CLIENT_INVENTORY_CSV_FILE)
+    if not filter_on_list:
+        print(f"No columns found in {CLIENT_INVENTORY_CSV_FILE} that can be used in filter queries. Cannot create {CLIENT_FILTER_ON_LIST_FILE}.")
+        return
+
+    with open(CLIENT_FILTER_ON_LIST_FILE, "w") as f:
+        for column in filter_on_list:
             f.write(f"{column}\n")
 
 
 @dbg_print
 def create_faq_file():
+    """Create the client FAQ file by copying from the shared FAQ template.
+
+    Expects a template file at ./faq_template/faq.txt (relative to this file).
     """
-    Creates a dummy FAQ file for the client with some example questions and answers.
-    """
-    faq_content = """Q: Are you open on weekends?\nKeywords: open, weekends, saturday, sunday\nA: Yes, we are open on Saturdays from 10am to 6pm and on Sundays from 11am to 5pm."""
-    with open(CLIENT_FAQ_FILE, "w") as f:
-        f.write(faq_content)
+    # Resolve the path to the template directory relative to this script
+    script_dir = os.path.dirname(__file__)
+    template_faq_path = os.path.join(script_dir, "faq_template", "faq.txt")
+
+    if not os.path.isfile(template_faq_path):
+        print(f"FAQ template not found at {template_faq_path}. Skipping FAQ creation.")
+        return
+
+    # Ensure target directory exists
+    os.makedirs(os.path.dirname(CLIENT_FAQ_FILE), exist_ok=True)
+
+    # Reuse existing file-copy helper if available; otherwise do a simple copy
+    try:
+        copy_file(template_faq_path, CLIENT_FAQ_FILE)
+    except NameError:
+        # Fallback: manual copy if copy_file is not defined in utils
+        with open(template_faq_path, "r", encoding="utf-8") as src, open(CLIENT_FAQ_FILE, "w", encoding="utf-8") as dst:
+            dst.write(src.read())
 
 
 @dbg_print
@@ -133,7 +171,8 @@ if __name__ == "__main__":
     create_metadata_files()
     index_inventory_to_chroma()
     create_faq_file()
+    index_faq_to_chroma()
     copy_system_prompts()
     get_all_valid_metadata_values_from_products()
 
-    print(f"\nYou;re ready to execute queries for {CLIENT_NAME}\n")
+    print(f"\nYou're ready to execute queries for {CLIENT_NAME}\n")

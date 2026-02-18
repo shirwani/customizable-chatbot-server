@@ -4,6 +4,7 @@ from functools import wraps
 import csv
 import json
 from dotenv import load_dotenv
+import pandas as pd
 
 load_dotenv()
 os.environ["DEBUG"] = os.getenv("DEBUG")
@@ -165,6 +166,32 @@ def dbg_print(func):
     return wrapper
 
 
+def get_non_unique_columns(csv_path: str) -> list[str]:
+    """Return column names from the CSV whose values are not all unique.
 
+    A column is considered "non-unique" if at least one value in that
+    column appears more than once.
+    """
+    # Reuse existing helper so CSV parsing is consistent across the project
+    rows = read_from_csv_file_with_header(csv_path)
+    if not rows:
+        return []
 
+    # Initialize tracking for seen values and a flag for each column
+    first_row = rows[0]
+    columns = list(first_row.keys())
+
+    seen_values = {col: set() for col in columns}
+    has_duplicate = {col: False for col in columns}
+
+    for row in rows:
+        for col in columns:
+            val = row.get(col)
+            if val in seen_values[col]:
+                has_duplicate[col] = True
+            else:
+                seen_values[col].add(val)
+
+    # Return columns where we detected at least one duplicate
+    return [col for col, dup in has_duplicate.items() if dup]
 
