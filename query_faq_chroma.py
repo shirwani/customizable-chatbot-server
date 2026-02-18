@@ -1,32 +1,20 @@
 from __future__ import annotations
-
 import os
 from typing import List, Dict, Any
-
-import chromadb
-from sentence_transformers import SentenceTransformer
-
-from utils import dbg_print, read_from_text_file, dump_to_json_file
-from llm_utils import generate_with_single_input
-
-# Configuration must mirror the indexing script
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CLIENT_SITE = os.environ.get("CLIENT_SITE", "")
-CLIENT_SITE_ROOT = os.path.join(PROJECT_ROOT, "client_sites", CLIENT_SITE)
-CLIENT_CHROMA_DB_PATH = os.path.join(CLIENT_SITE_ROOT, "chroma_db")
-COLLECTION_NAME = "faq"
-FAQ_EMBEDDER_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-CLIENT_SYSTEM_PROMPTS_PATH = os.path.join(CLIENT_SITE_ROOT, "system_prompts")
-FAQ_SYNTH_PROMPT_FILE = os.path.join(CLIENT_SYSTEM_PROMPTS_PATH, "query_faq.txt")
-
+from llm_utils import (
+    get_faq_collection,
+    get_faq_embedder,
+    get_client_faq_synth_prompt_file,
+    generate_with_single_input,
+)
+from utils import dbg_print, read_from_text_file
 
 def _get_collection():
-    client = chromadb.PersistentClient(path=CLIENT_CHROMA_DB_PATH)
-    return client.get_or_create_collection(name=COLLECTION_NAME)
+    return get_faq_collection()
 
 
-def _get_faq_embedder() -> SentenceTransformer:
-    return SentenceTransformer(FAQ_EMBEDDER_MODEL_NAME)
+def _get_faq_embedder():
+    return get_faq_embedder()
 
 
 def _normalize_keywords(kw_list: List[str]) -> List[str]:
@@ -73,8 +61,9 @@ def _synthesize_answer(query: str, matches: List[Dict[str, Any]]) -> str:
     faq_context = "\n\n".join(faq_context_lines)
 
     # Try loading a client-specific synthesis prompt template if present
-    if os.path.isfile(FAQ_SYNTH_PROMPT_FILE):
-        prompt_template = read_from_text_file(FAQ_SYNTH_PROMPT_FILE)
+    synth_prompt_path = get_client_faq_synth_prompt_file()
+    if os.path.isfile(synth_prompt_path):
+        prompt_template = read_from_text_file(synth_prompt_path)
         prompt = prompt_template.format(faq_context=faq_context, query=query)
     else:
         # Fallback generic prompt
@@ -168,7 +157,7 @@ def query_faq_chroma(query: str, top_k: int = 3):
 
     synthesized = _synthesize_answer(query, matches)
 
-    print(f"query_faq_chroma() -> matches: {matches}, synthesized answer: {synthesized}")
+    print(f"    - query_faq_chroma() -> matches: {matches}, synthesized answer: {synthesized}")
     return synthesized
 
 
@@ -176,7 +165,7 @@ if __name__ == "__main__":
     # Small smoke test
     test_queries = [
         #"Are you hiring?",
-        #"Do you offer discounts?",
+        "Do you sell gift cards?",
         "What are your weakand hours?",
         #"Do you give free estimates?",
         #"Something unrelated to faq",

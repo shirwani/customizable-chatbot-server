@@ -1,28 +1,27 @@
 """Create a ChromaDB collection from the products inventory CSV.
 
-This script reads CLIENT_INVENTORY_CSV_FILE, builds sentence embeddings for each
-row using the same SentenceTransformer model as in `utils.py`, and stores
-entries in a persistent ChromaDB collection located under CLIENT_CHROMA_DB_PATH.
+This script reads the client inventory CSV (via get_client_inventory_csv_file()), builds
+sentence embeddings for each row, and stores entries in a persistent ChromaDB
+collection located under the client-specific chroma_db path.
 
-The collection is called "products" (aligned with `utils.products_collection`).
-
-Usage (from project root):
-
-    python create_chromadb_collection.py
-
-The script is idempotent with respect to document IDs: it will skip rows whose
-IDs are already present in the collection, so you can safely re-run it after
-adding new rows.
+The collection is called "products".
 """
-from llm_utils import *
-import chromadb
+import os
+import csv
 from typing import List, Dict
+from llm_utils import (
+    get_client_chroma_db_path,
+    get_products_collection_name,
+    get_products_embedder,
+    get_client_inventory_csv_file,
+    get_client_metadata_fields_list,
+    get_chroma_db_client,
+)
+
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-
-COLLECTION_NAME = "products"
 
 # Use cosine similarity as in the other project
 HNSW_CONFIG = {
@@ -126,11 +125,8 @@ def _build_text_for_row(row: Dict[str, str]) -> str:
 
 def _ensure_collection():
     """Create or get the ChromaDB collection used for products."""
-    client = chromadb.PersistentClient(path=CLIENT_CHROMA_DB_PATH)
-    # Configuration is optional and may be version-specific; omit for maximum compatibility
-    collection = client.get_or_create_collection(name=COLLECTION_NAME)
-
-    return collection
+    client = get_chroma_db_client()
+    return client.get_or_create_collection(get_products_collection_name())
 
 
 def _get_existing_ids(collection) -> set:
@@ -158,7 +154,7 @@ def index_inventory_to_chroma(batch_size: int = 512) -> None:
     Args:
         batch_size: Number of rows to embed and add per batch.
     """
-    rows = _load_rows(CLIENT_INVENTORY_CSV_FILE)
+    rows = _load_rows(get_client_inventory_csv_file())
     if not rows:
         print("No rows found in products.csv; nothing to index.")
         return
@@ -168,7 +164,7 @@ def index_inventory_to_chroma(batch_size: int = 512) -> None:
     existing_ids = _get_existing_ids(collection)
 
     # Load metadata field names from configuration file
-    metadata_fields = _load_metadata_fields(CLIENT_METADATA_FIELDS_LIST)
+    metadata_fields = _load_metadata_fields(get_client_metadata_fields_list())
 
     to_index = []
     for row in rows:
@@ -184,7 +180,10 @@ def index_inventory_to_chroma(batch_size: int = 512) -> None:
         print("All rows already indexed; nothing new to add.")
         return
 
-    print(f"Indexing {len(to_index)} new rows into Chroma collection '{COLLECTION_NAME}' at '{CLIENT_CHROMA_DB_PATH}'...")
+    print(
+        f"Indexing {len(to_index)} new rows into Chroma collection '{get_products_collection_name()}' "
+        f"at '{get_client_chroma_db_path()}'..."
+    )
 
     docs_batch: List[str] = []
     metas_batch: List[Dict[str, str]] = []
@@ -194,7 +193,12 @@ def index_inventory_to_chroma(batch_size: int = 512) -> None:
         nonlocal docs_batch, metas_batch, ids_batch
         if not docs_batch:
             return
-        embeddings = products_embedder.encode(docs_batch, show_progress_bar=False, convert_to_numpy=True)
+
+        embeddings = get_products_embedder().encode(
+            docs_batch,
+            show_progress_bar=False,
+            convert_to_numpy=True,
+        )
         collection.add(documents=docs_batch, metadatas=metas_batch, ids=ids_batch, embeddings=embeddings)
         print(f"  Added batch of {len(ids_batch)} items.")
         docs_batch, metas_batch, ids_batch = [], [], []

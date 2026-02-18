@@ -1,4 +1,11 @@
-from llm_utils import *
+from llm_utils import (
+    get_client_system_prompts_path,
+    generate_params_dict,
+    generate_with_single_input,
+)
+from utils import dbg_print, read_from_text_file
+import os
+
 
 @dbg_print
 def get_query_type(query: str) -> str:
@@ -12,11 +19,12 @@ def get_query_type(query: str) -> str:
     - str: The label 'PRODUCT' if it relates to product information, or 'OTHER'.
     """
 
-    prompt = read_from_text_file(os.path.join(CLIENT_SYSTEM_PROMPTS_PATH, "get_query_type.txt"))
+    prompt_path = os.path.join(get_client_system_prompts_path(), "get_query_type.txt")
+    prompt = read_from_text_file(prompt_path)
     prompt = prompt.format(query=query)
     kwargs = generate_params_dict(prompt=prompt, temperature=0.3)
     response = generate_with_single_input(**kwargs)
-    print(f"get_query_type() -> response: {response}")
+    print(f"    - get_query_type() -> response: {response}")
     return response
 
 

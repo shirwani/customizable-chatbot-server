@@ -8,8 +8,6 @@ import pandas as pd
 
 load_dotenv()
 os.environ["DEBUG"] = os.getenv("DEBUG")
-os.environ["CLIENT_SITE"] = os.getenv("CLIENT_SITE")
-os.environ["LOCAL_LLM_MODEL"] = os.getenv("LOCAL_LLM_MODEL")
 
 def read_from_csv_file_with_header(file):
     """

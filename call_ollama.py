@@ -1,5 +1,5 @@
 import ollama
-from llm_utils import *
+from utils import *
 
 @dbg_print
 def ask_local_ollama_llama3(payload: dict = None):

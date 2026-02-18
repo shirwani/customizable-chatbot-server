@@ -1,8 +1,19 @@
-from llm_utils import *
-from typing import List
+from llm_utils import (
+    get_products_embedder,
+    get_products_collection,
+    get_client_filter_on_list_file,
+    get_client_metadata_fields_list,
+    get_client_system_prompts_path,
+    get_params_for_task,
+    generate_params_dict,
+    generate_with_single_input,
+)
+from utils import dbg_print, read_file_as_list, read_file_as_tuple, read_from_text_file
 import numpy as np
 from metadata_filters import generate_serializeable_metadata_filters_from_query
 from technical_or_creative import technical_or_creative
+from typing import List
+import os
 
 @dbg_print
 def _build_chroma_where_from_filters(filters: list[dict] | None) -> dict:
@@ -64,11 +75,6 @@ def get_relevant_products_from_query(query: str):
       4. If the result set is small, gradually relaxes the filters following
          an importance order to broaden the search.
 
-    Requirements/assumptions (for callers):
-      - A global `products_collection` exists and is a ChromaDB collection.
-      - A global `products_embedder` (e.g. SentenceTransformer) exists and
-        can produce embeddings via `.encode([query], convert_to_numpy=True)`.
-
     Returns:
       A list of product result dicts from ChromaDB.
     """
@@ -78,8 +84,8 @@ def get_relevant_products_from_query(query: str):
     # Build base where clause
     base_where = _build_chroma_where_from_filters(filters)
 
-    # Prepare query embedding using the global embedder
-    query_embedding = products_embedder.encode([query], convert_to_numpy=True)
+    # Prepare query embedding using the embedder getter
+    query_embedding = get_products_embedder().encode([query], convert_to_numpy=True)
 
     def _run_chroma_query(where_clause: dict | None, limit: int = 20) -> List[dict]:
         """Helper to run a Chroma query and normalize results into a list of product dicts."""
@@ -89,7 +95,7 @@ def get_relevant_products_from_query(query: str):
         if not where_clause:
             where_clause = None
 
-        results = products_collection.query(
+        results = get_products_collection().query(
             query_embeddings=query_embedding,
             n_results=limit,
             where=where_clause,
@@ -123,7 +129,7 @@ def get_relevant_products_from_query(query: str):
 
     # If the result set is small, gradually relax filters using importance order
     # importance_order = ['baseColor', 'masterCategory', 'usage', 'masterCategory', 'season', 'gender']
-    importance_order = read_file_as_list(CLIENT_FILTER_ON_LIST_FILE)
+    importance_order = read_file_as_list(get_client_filter_on_list_file())
 
     def _filters_without_low_importance(current_filters: list[dict], drop_after_index: int) -> list[dict]:
         if drop_after_index + 1 >= len(importance_order):
@@ -167,7 +173,7 @@ def generate_items_context(relevant_products: list) -> str:
          Each product detail includes the product ID, name, category, usage, gender, type, color,
          season, and year.
     """
-    metadata_fields = read_file_as_tuple(CLIENT_METADATA_FIELDS_LIST)
+    metadata_fields = read_file_as_tuple(get_client_metadata_fields_list())
     t = ""  # Initialize an empty string to accumulate product information
 
     for item in relevant_products:  # Iterate through each item in the results list
@@ -212,7 +218,8 @@ def query_products(query: str) -> dict:
     # Create a context string from the relevant products
     context = generate_items_context(relevant_products)
 
-    prompt = read_from_text_file(os.path.join(CLIENT_SYSTEM_PROMPTS_PATH, "query_products.txt"))
+    prompt_path = os.path.join(get_client_system_prompts_path(), "query_products.txt")
+    prompt = read_from_text_file(prompt_path)
     prompt = prompt.format(context=context, query=query)
     kwargs = generate_params_dict(prompt, role='assistant', **parameters_dict)
     result = generate_with_single_input(**kwargs)

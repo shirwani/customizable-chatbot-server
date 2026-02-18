@@ -20,33 +20,19 @@ safely re-run it after updating the FAQ file.
 """
 
 from __future__ import annotations
-
 import os
 import re
 from typing import List, Dict
-
-import chromadb
-from sentence_transformers import SentenceTransformer
-
+from llm_utils import (
+    get_client_faq_file,
+    get_client_name,
+    get_faq_collection,
+    get_faq_embedder,
+    get_faq_collection_name,
+    get_client_chroma_db_path,
+    get_chroma_db_client,
+)
 from utils import read_from_text_file
-
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-
-# Collection name requested by the user
-COLLECTION_NAME = "faq"
-
-CLIENT_NAME = os.getenv("CLIENT_SITE", "demo")
-CLIENT_SITES_LOCATION = os.getenv("CLIENT_SITES_LOCATION", os.path.join(os.path.dirname(__file__), "..", "client_sites"))
-CLIENT_PATH = os.path.join(CLIENT_SITES_LOCATION, CLIENT_NAME)
-CLIENT_FAQ_PATH = os.path.join(CLIENT_PATH, "faq")
-CLIENT_FAQ_FILE = os.path.join(CLIENT_FAQ_PATH, "faq.txt")
-CLIENT_CHROMA_DB_PATH = os.path.join(CLIENT_PATH, "chroma_db")
-
-# Reuse the same model as products for consistency / speed
-FAQ_EMBEDDER_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -54,21 +40,11 @@ FAQ_EMBEDDER_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 def _ensure_faq_file_exists() -> None:
     """Validate that the FAQ file exists."""
-    if not os.path.isfile(CLIENT_FAQ_FILE):
+    if not os.path.isfile(get_client_faq_file()):
         raise FileNotFoundError(
-            f"FAQ file not found at {CLIENT_FAQ_FILE}. "
+            f"FAQ file not found at {get_client_faq_file()}. "
             "Expected path: client_sites/CLIENT_SITE/faq/faq.txt"
         )
-
-
-def _ensure_collection():
-    """Create or get the ChromaDB collection used for FAQ content."""
-    # Ensure the target directory exists
-    os.makedirs(CLIENT_CHROMA_DB_PATH, exist_ok=True)
-
-    client = chromadb.PersistentClient(path=CLIENT_CHROMA_DB_PATH)
-    collection = client.get_or_create_collection(name=COLLECTION_NAME)
-    return collection
 
 
 def _get_existing_ids(collection) -> set:
@@ -149,10 +125,9 @@ def index_faq_to_chroma() -> None:
 
     _ensure_faq_file_exists()
 
-    collection = _ensure_collection()
-    existing_ids = _get_existing_ids(collection)
+    existing_ids = _get_existing_ids(get_faq_collection())
 
-    faq_text: str = read_from_text_file(CLIENT_FAQ_FILE)
+    faq_text: str = read_from_text_file(get_client_faq_file())
     if not faq_text.strip():
         print("FAQ file is empty; nothing to index.")
         return
@@ -161,8 +136,6 @@ def index_faq_to_chroma() -> None:
     if not entries:
         print("No FAQ entries parsed; check FAQ format.")
         return
-
-    embedder = SentenceTransformer(FAQ_EMBEDDER_MODEL_NAME)
 
     docs: List[str] = []
     metadatas: List[Dict[str, object]] = []
@@ -180,7 +153,7 @@ def index_faq_to_chroma() -> None:
                 "question": entry.get("question", ""),
                 "answer": entry.get("answer", ""),
                 "keywords": entry.get("keywords", []),
-                "client_site": CLIENT_NAME,
+                "client_site": get_client_name(),
                 "source": "faq.txt",
             }
         )
@@ -190,25 +163,29 @@ def index_faq_to_chroma() -> None:
         print("All FAQ entries already indexed; nothing new to add.")
         return
 
-    embeddings = embedder.encode(docs, convert_to_numpy=True)
-    collection.add(documents=docs, metadatas=metadatas, ids=ids, embeddings=embeddings)
+    embeddings = get_faq_embedder().encode(docs, convert_to_numpy=True)
+    get_faq_collection().add(
+        documents=docs,
+        metadatas=metadatas,
+        ids=ids,
+        embeddings=embeddings,
+    )
 
     print(
-        f"Indexed {len(ids)} FAQ entries for client '{CLIENT_NAME}' into Chroma collection "
-        f"'{COLLECTION_NAME}' at '{CLIENT_CHROMA_DB_PATH}'."
+        f"Indexed {len(ids)} FAQ entries for client '{get_client_name()}' into Chroma collection "
+        f"'{get_faq_collection_name()}' at '{get_client_chroma_db_path()}'."
     )
 
 
 def drop_faq_collection() -> None:
     """Delete the `faq` collection for the configured client site if present."""
-
-    client = chromadb.PersistentClient(path=CLIENT_CHROMA_DB_PATH)
-
     try:
-        client.delete_collection("faq")
-        print("Deleted 'faq' collection.")
+        get_chroma_db_client().delete_collection(get_faq_collection_name())
+        print(f"Deleted '{get_faq_collection_name()}' collection.")
     except Exception as e:
-        print(f"Could not delete 'faq' collection (may not exist yet): {e}")
+        print(
+            f"Could not delete '{get_faq_collection_name()}' collection (may not exist yet): {e}"
+        )
 
 
 if __name__ == "__main__":

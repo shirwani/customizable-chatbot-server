@@ -1,4 +1,11 @@
-from llm_utils import *
+from llm_utils import (
+    get_client_system_prompts_path,
+    generate_params_dict,
+    generate_with_single_input,
+)
+from utils import dbg_print, read_from_text_file
+import os
+
 
 @dbg_print
 def technical_or_creative(query: str) -> str:
@@ -13,11 +20,12 @@ def technical_or_creative(query: str) -> str:
       None if the label is inconclusive.
     """
 
-    prompt = read_from_text_file(os.path.join(CLIENT_SYSTEM_PROMPTS_PATH, "technical_or_creative.txt"))
+    prompt_path = os.path.join(get_client_system_prompts_path(), "technical_or_creative.txt")
+    prompt = read_from_text_file(prompt_path)
     prompt = prompt.format(query=query)
     kwargs = generate_params_dict(prompt=prompt, temperature=0, max_tokens=2048)
     response = generate_with_single_input(**kwargs)
-    print(f"technical_or_creative() -> response: {response}")
+    print(f"    - technical_or_creative() -> response: {response}")
     return response
 
 
@@ -36,5 +44,3 @@ if __name__ == "__main__":
     for query in test_queries:
         result = technical_or_creative(query)
         print(f"Query: '{query}' => Label: {result}")
-
-

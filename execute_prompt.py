@@ -1,9 +1,14 @@
-from utils import *
-from llm_utils import *
+from utils import dbg_print, read_from_text_file
+from llm_utils import (
+    get_client_system_prompts_path,
+    generate_params_dict,
+    generate_with_single_input,
+)
 from query_type import get_query_type
 from query_products import query_products
 from query_faq_chroma import query_faq_chroma
 from spell_corrector import SpellCorrector
+import os
 
 # Build a shared spell corrector backed by a general English word list if available.
 # If the optional `wordfreq` dependency is missing, fail soft and continue without
@@ -69,7 +74,8 @@ def do_execute_prompt(query: str) -> dict | None:
             return response
 
     # Default response for queries that do not fit FAQ or Product categories
-    prompt = read_from_text_file(os.path.join(CLIENT_SYSTEM_PROMPTS_PATH, "fall_through_query_type.txt"))
+    prompt_path = os.path.join(get_client_system_prompts_path(), "fall_through_query_type.txt")
+    prompt = read_from_text_file(prompt_path)
     prompt = prompt.format(query=query)
     kwargs = generate_params_dict(prompt=prompt, temperature=0.5)
     response = generate_with_single_input(**kwargs)

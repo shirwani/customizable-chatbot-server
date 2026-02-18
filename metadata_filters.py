@@ -1,4 +1,14 @@
-from llm_utils import *
+from llm_utils import (
+    get_client_valid_metadata_values_file,
+    get_client_system_prompts_path,
+    get_client_filter_on_list_file,
+    generate_params_dict,
+    generate_with_single_input,
+    parse_json_output,
+)
+from utils import dbg_print, read_from_text_file, read_from_json_file, read_file_as_tuple, dump_to_json_file
+import os
+
 
 @dbg_print
 def generate_metadata_filters_from_query(query: str) -> dict | None:
@@ -20,9 +30,12 @@ def generate_metadata_filters_from_query(query: str) -> dict | None:
       default to {"min": 0, "max": "inf"}.
     """
 
-    all_valid_metadata_values = read_from_json_file(CLIENT_VALID_METADATA_VALUES_FILE)
+    all_valid_metadata_values = read_from_json_file(get_client_valid_metadata_values_file())
 
-    prompt = read_from_text_file(os.path.join(CLIENT_SYSTEM_PROMPTS_PATH, "generate_metadata_filters_from_query.txt"))
+    prompt_path = os.path.join(
+        get_client_system_prompts_path(), "generate_metadata_filters_from_query.txt"
+    )
+    prompt = read_from_text_file(prompt_path)
     prompt = prompt.format(values=all_valid_metadata_values, query=query)
     kwargs = generate_params_dict(prompt=prompt, temperature=0.0, max_tokens=1500)
     metadata_filters_from_query = parse_json_output(generate_with_single_input(**kwargs))
@@ -53,7 +66,7 @@ def generate_serializeable_metadata_filters_from_query(query: str) -> list[dict]
         return None
 
     # Define a tuple of valid keys that are allowed for filtering. This should match the keys that are expected in the metadata and that the system can filter on.
-    valid_keys = read_file_as_tuple(CLIENT_FILTER_ON_LIST_FILE)
+    valid_keys = read_file_as_tuple(get_client_filter_on_list_file())
 
     # Initialize an empty list to store the filters
     serializeable_metadata_filters_from_query: list[dict] = []
@@ -121,6 +134,3 @@ if __name__ == "__main__":
     serializeable_metadata_filters_from_query = generate_serializeable_metadata_filters_from_query(query)
     print("-> Output in ./serializeable_metadata_filters_from_query.json")
     dump_to_json_file("./serializeable_metadata_filters_from_query.json", serializeable_metadata_filters_from_query, indent=2)
-
-
-
