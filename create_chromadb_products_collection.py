@@ -137,7 +137,7 @@ def _get_existing_ids(collection) -> set:
     """
     existing_ids: set = set()
     # Use a broad query to retrieve ids only; Chroma returns up to ~10k by default.
-    res = collection.get(include=["metadatas"], limit=100000)
+    res = collection.get(include=["metadatas"], limit=1000000)
     for batch in res.get("ids", []) or []:
         for _id in batch:
             existing_ids.add(str(_id))
