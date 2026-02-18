@@ -85,15 +85,15 @@ def do_execute_prompt(query: str) -> dict | None:
 if __name__ == '__main__':
     test_queries = [
         #"Do you offer discounts?",
-        "What are your store hours?",
+        "Do you carry any summer dresses?",
         #"What is your return policy?",
         #"Make a wonderful look for a man attending a wedding party happening during night.",
         #"How do I track my order?",
-        "Do you have a waterproof jacket under $400?",
+        #"Do you have a waterproof jacket under $400?",
         #"What's a good look for a woman to wear to a park on a Sunday afternoon?",
         #"Can I cancel my order after placing it?"
-        "Are you hiring?",
-        "Are you open on weekends?",
+        #"Are you hiring?",
+        #"Are you open on weekends?",
     ]
     for query in test_queries:
         response = do_execute_prompt(query)

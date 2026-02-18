@@ -10,8 +10,8 @@ app = Flask(__name__)
 # Enable cross-origin calls from the local http server / embedded sites.
 # This avoids browser "TypeError: Failed to fetch" caused by CORS blocking.
 allowed_origins = {
-    "http://127.0.0.1:8001",
-    "http://localhost:8001",
+    "http://127.0.0.1:8002",
+    "http://localhost:8002",
 }
 
 try:

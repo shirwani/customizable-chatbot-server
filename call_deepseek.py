@@ -24,7 +24,7 @@ def ask_deepseek_r1(payload: dict) -> str:
     base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
     model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 
-    print(f"\nAsking DeepSeek R1 ({model}) via {base_url}...")
+    print(f"\nAsking ({model}) via {base_url}...")
 
     client = OpenAI(api_key=deepseek_key, base_url=base_url)
 
